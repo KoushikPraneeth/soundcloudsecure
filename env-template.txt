@@ -1,0 +1,37 @@
+# Supabase Configuration
+SUPABASE_URL=your-supabase-url
+SUPABASE_KEY=your-supabase-key
+
+# Dropbox API
+DROPBOX_APP_KEY=your-dropbox-app-key
+DROPBOX_APP_SECRET=your-dropbox-app-secret
+DROPBOX_REDIRECT_URI=http://localhost:5173/auth/dropbox/callback
+
+# Genius API
+GENIUS_CLIENT_ID=your-genius-client-id
+GENIUS_CLIENT_SECRET=your-genius-client-secret
+GENIUS_ACCESS_TOKEN=your-genius-access-token
+GENIUS_REDIRECT_URI=http://localhost:5173
+
+# Frontend Environment Variables (these will be used in the frontend Dockerfile)
+VITE_DROPBOX_APP_KEY=your-dropbox-app-key
+VITE_DROPBOX_APP_SECRET=your-dropbox-app-secret
+VITE_DROPBOX_REDIRECT_URI=http://localhost:5173/auth/dropbox/callback
+VITE_GENIUS_CLIENT_ID=your-genius-client-id
+VITE_GENIUS_CLIENT_SECRET=your-genius-client-secret
+VITE_GENIUS_ACCESS_TOKEN=your-genius-access-token
+VITE_GENIUS_REDIRECT_URI=http://localhost:5173
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+VITE_SUPABASE_URL=your-supabase-url
+
+# No local database needed as we're using Supabase
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost
+
+# JWT Configuration
+JWT_SECRET=your-jwt-secret-key
+JWT_EXPIRATION=86400000
+
+# Spring Profile
+SPRING_PROFILES_ACTIVE=dev

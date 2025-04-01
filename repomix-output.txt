@@ -1,0 +1,3228 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+frontend/
+  src/
+    components/
+      AuthCallback.tsx
+      Layout.tsx
+      Library.tsx
+      Modal.tsx
+      Player.css
+      Player.tsx
+      Playlists.tsx
+      Profile.tsx
+      Settings.tsx
+      SupabaseAuthCallback.tsx
+      TrackSkeleton.tsx
+    store/
+      authStore.ts
+      playerStore.ts
+      supabaseAuthStore.ts
+      themeStore.ts
+    types/
+      auth.ts
+      supabase.ts
+    utils/
+      dropbox.ts
+      encryption.ts
+      metadata.ts
+      supabase.ts
+    App.tsx
+    index.css
+    main.tsx
+    types.ts
+    vite-env.d.ts
+  .gitignore
+  eslint.config.js
+  index.html
+  package.json
+  postcss.config.js
+  tailwind.config.js
+  tsconfig.app.json
+  tsconfig.json
+  tsconfig.node.json
+  vite.config.ts
+.gitignore
+package.json
+
+================================================================
+Files
+================================================================
+
+================
+File: frontend/src/components/AuthCallback.tsx
+================
+import React, { useEffect, useRef } from "react";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { handleAuthCallback } from "../utils/dropbox";
+import { useAuthStore } from "../store/authStore";
+import { RefreshCw } from "lucide-react";
+
+export const AuthCallback: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const { error, isAuthenticated, isAuthenticating } = useAuthStore();
+  const hasHandledRef = useRef(false);
+
+  // Clear query parameters after successful auth
+  const clearQueryParams = () => {
+    const newUrl = `${location.pathname}${location.hash}`;
+    window.history.replaceState({}, "", newUrl);
+  };
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    const errorParam = searchParams.get("error");
+    const state = searchParams.get("state");
+
+    console.log("Auth callback params:", { code, error: errorParam, state });
+
+    // Skip if already authenticated or already handled
+    if (isAuthenticated || hasHandledRef.current) {
+      console.log("Skipping auth callback: Already authenticated or handled");
+      navigate("/");
+      return;
+    }
+
+    if (errorParam) {
+      console.error("Dropbox auth error:", errorParam);
+      useAuthStore.getState().setAuth({
+        error: `Authentication failed: ${errorParam}`,
+        isAuthenticating: false,
+      });
+      navigate("/");
+      return;
+    }
+
+    if (code) {
+      hasHandledRef.current = true;
+      console.log("Handling auth code...");
+      useAuthStore.getState().setAuth({ isAuthenticating: true });
+
+      handleAuthCallback(code)
+        .then(() => {
+          console.log("Auth successful, redirecting...");
+          clearQueryParams();
+          navigate("/");
+        })
+        .catch((error) => {
+          console.error("Auth callback error:", error);
+          useAuthStore.getState().setAuth({
+            error:
+              error instanceof Error ? error.message : "Authentication failed",
+            isAuthenticating: false,
+          });
+          navigate("/");
+        });
+    } else {
+      console.error("No code or error in callback");
+      useAuthStore.getState().setAuth({
+        error: "No authorization code received",
+        isAuthenticating: false,
+      });
+      navigate("/");
+    }
+  }, [
+    searchParams,
+    navigate,
+    isAuthenticated,
+    location.pathname,
+    location.hash,
+  ]);
+
+  if (isAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="text-center p-8">
+          <RefreshCw
+            className="mx-auto mb-4 text-blue-600 dark:text-blue-400 animate-spin"
+            size={48}
+          />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Authenticating...
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Connecting your Dropbox account
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md max-w-md">
+          <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
+            Authentication Error
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+            {error}
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+          >
+            Return Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          Authenticating...
+        </h2>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400 mx-auto"></div>
+      </div>
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/Layout.tsx
+================
+import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Music, List, Settings, Moon, Sun, LogOut, User } from 'lucide-react';
+import { useThemeStore } from '../store/themeStore';
+import useSupabaseAuthStore from '../store/supabaseAuthStore';
+import { signOut } from '../utils/supabase';
+
+export const Layout: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isDarkMode, toggleTheme } = useThemeStore();
+  const { user: supabaseUser } = useSupabaseAuthStore();
+
+  const navItems = [
+    { path: '/', label: 'Library', icon: Music },
+    { path: '/playlists', label: 'Playlists', icon: List },
+    { path: '/profile', label: 'Profile', icon: User },
+    { path: '/settings', label: 'Settings', icon: Settings },
+  ];
+
+  return (
+    <div className={`min-h-screen flex ${isDarkMode ? 'dark' : ''}`}>
+      {/* Sidebar */}
+      <div className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <div className="p-4">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white">
+            SoundVaultPro
+          </h1>
+        </div>
+
+        <nav className="mt-8">
+          {navItems.map(({ path, label, icon: Icon }) => (
+            <button
+              key={path}
+              onClick={() => navigate(path)}
+              className={`w-full flex items-center px-6 py-3 text-sm font-medium transition-colors
+                ${
+                  location.pathname === path
+                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+            >
+              <Icon size={18} className="mr-3" />
+              {label}
+            </button>
+          ))}
+          {supabaseUser && (
+            <button
+              onClick={signOut}
+              className="w-full flex items-center px-6 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            >
+              <LogOut size={18} className="mr-3" />
+              Sign Out
+            </button>
+          )}
+        </nav>
+
+        <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200 dark:border-gray-800">
+          <button
+            onClick={toggleTheme}
+            className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors w-full"
+          >
+            {isDarkMode ? (
+              <>
+                <Sun size={18} className="mr-3" />
+                Light Mode
+              </>
+            ) : (
+              <>
+                <Moon size={18} className="mr-3" />
+                Dark Mode
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 bg-gray-50 dark:bg-gray-900">
+        <main className="h-full">{children}</main>
+      </div>
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/Library.tsx
+================
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { Music, Lock } from 'lucide-react';
+import { usePlayerStore } from '../store/playerStore';
+import { useAuthStore } from '../store/authStore';
+import { createDropboxClient, fetchFiles } from '../utils/dropbox';
+import { processMetadata } from '../utils/metadata';
+import { DropboxError, Track } from '../types';
+import { TrackSkeleton } from './TrackSkeleton';
+
+const LOAD_TIMEOUT = 30000; // 30 seconds timeout
+const SCROLL_THRESHOLD = 0.8; // 80% of the height
+
+export const Library: React.FC = () => {
+  const {
+    playlist,
+    currentTrack,
+    setCurrentTrack,
+    setPlaylist,
+    appendToPlaylist,
+    isLoadingMore,
+    setIsLoadingMore,
+    hasMore,
+    setHasMore,
+    cursor,
+    setCursor,
+    isLoadingMetadata,
+    metadataError,
+  } = usePlayerStore();
+  const { isAuthenticated } = useAuthStore();
+  const [loading, setLoading] = useState(false);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(LOAD_TIMEOUT / 1000);
+  const [error, setError] = useState<string | null>(null);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  const loadMoreTracks = useCallback(async () => {
+    if (!cursor || !hasMore || isLoadingMore || loading) return;
+
+    const client = createDropboxClient();
+    if (!client) {
+      setError('Not authenticated with Dropbox');
+      return;
+    }
+
+    try {
+      setIsLoadingMore(true);
+      const tracks = await fetchFiles(client, cursor);
+      await processMetadata(tracks);
+      appendToPlaylist(tracks);
+    } catch (err) {
+      console.error('Failed to load more tracks:', err);
+      let errorMessage = 'Failed to load more tracks. Please try again.';
+      
+      if (err instanceof DropboxError) {
+        switch (err.code) {
+          case 'path/not_found':
+            errorMessage = 'Could not access Dropbox root directory. Please check your permissions.';
+            break;
+          case 'invalid_access_token':
+          case 'expired_access_token':
+            errorMessage = 'Your Dropbox session has expired. Please reconnect your account.';
+            break;
+          default:
+            errorMessage = err.description || err.message;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [cursor, hasMore, isLoadingMore, loading, appendToPlaylist, setIsLoadingMore]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreTracks();
+        }
+      },
+      {
+        root: null,
+        rootMargin: '20px',
+        threshold: SCROLL_THRESHOLD
+      }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [loadMoreTracks]);
+
+  const loadInitialTracks = async (): Promise<{ cleanup: () => void }> => {
+    const client = createDropboxClient();
+    if (!client) {
+      setError('Not authenticated with Dropbox');
+      return { cleanup: () => {} };
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setTimeoutSeconds(LOAD_TIMEOUT / 1000);
+      setCursor(null);
+      setHasMore(true);
+
+      let cleanupFn: () => void = () => {};
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        const startTime = Date.now();
+        const intervalId = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, Math.ceil((LOAD_TIMEOUT - elapsed) / 1000));
+          setTimeoutSeconds(remaining);
+        }, 1000);
+
+        const timeoutId = setTimeout(() => {
+          clearInterval(intervalId);
+          reject(new Error('Loading tracks timed out. Please try again.'));
+        }, LOAD_TIMEOUT);
+
+        cleanupFn = () => {
+          clearInterval(intervalId);
+          clearTimeout(timeoutId);
+        };
+      });
+
+      const tracks = await Promise.race([
+        fetchFiles(client),
+        timeoutPromise
+      ]);
+
+      await processMetadata(tracks);
+      setPlaylist(tracks);
+      return { cleanup: cleanupFn };
+    } catch (err) {
+      console.error('Failed to load tracks:', err);
+      let errorMessage = 'Failed to load tracks. Please try again.';
+      
+      if (err instanceof DropboxError) {
+        switch (err.code) {
+          case 'path/not_found':
+            errorMessage = 'Could not access Dropbox root directory. Please check your permissions.';
+            break;
+          case 'invalid_access_token':
+          case 'expired_access_token':
+            errorMessage = 'Your Dropbox session has expired. Please reconnect your account.';
+            break;
+          default:
+            errorMessage = err.description || err.message;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      return { cleanup: () => {} };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    if (isAuthenticated) {
+      const loadTracksWithCleanup = async () => {
+        try {
+          const { cleanup: trackCleanup } = await loadInitialTracks();
+          cleanup = trackCleanup;
+        } catch (error) {
+          console.error('Failed to start loading tracks:', error);
+        }
+      };
+
+      loadTracksWithCleanup();
+    }
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, [isAuthenticated]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Library</h2>
+        <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+          <Lock size={16} />
+          <span>End-to-End Encrypted</span>
+        </div>
+      </div>
+
+      {metadataError && (
+        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-sm text-red-600 dark:text-red-400">{metadataError}</p>
+        </div>
+      )}
+
+      <div className="grid gap-4">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <TrackSkeleton key={index} />
+          ))
+        ) : error ? (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
+            <div className="text-red-500 dark:text-red-400 mb-4 max-w-md mx-auto">{error}</div>
+            <button
+              onClick={() => loadInitialTracks()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+            >
+              Retry
+            </button>
+          </div>
+        ) : playlist.length === 0 ? (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
+            <Music className="mx-auto mb-4 text-gray-400 dark:text-gray-500" size={48} />
+            <div className="text-center">
+              <p className="text-gray-600 dark:text-gray-400 mb-2">
+                {isAuthenticated 
+                  ? 'No music files found in your Dropbox root directory' 
+                  : 'Connect your Dropbox to start playing music'}
+              </p>
+              {isAuthenticated && (
+                <>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    To get started:
+                  </p>
+                  <ol className="text-sm text-gray-500 dark:text-gray-400 text-left list-decimal list-inside space-y-2">
+                    <li>Go to <a href="https://www.dropbox.com/home" target="_blank" rel="noopener" className="text-blue-500 dark:text-blue-400 hover:underline transition-colors duration-200">dropbox.com/home</a></li>
+                    <li>Upload your music files (.mp3, .m4a, .wav, .ogg, or .flac)</li>
+                    <li>Wait a moment and click the retry button below</li>
+                  </ol>
+                  <button
+                    onClick={() => loadInitialTracks()}
+                    className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+                  >
+                    Retry Loading Tracks
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {playlist.map((track) => (
+              <div
+                key={track.id}
+                onClick={() => setCurrentTrack(track)}
+                className={`p-4 rounded-lg cursor-pointer transition-all duration-200 transform hover:scale-[1.02] ${
+                  currentTrack?.id === track.id
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 shadow-md'
+                    : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-100 dark:border-gray-700 hover:shadow-md'
+                } border`}
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-md flex items-center justify-center overflow-hidden">
+                    {track.metadata?.picture ? (
+                      <img
+                        src={track.metadata.picture.data}
+                        alt={track.metadata.picture.description}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Music size={20} className="text-gray-500 dark:text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white">
+                      {track.metadata?.title || track.name}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {track.metadata?.artist || 'Unknown Artist'}
+                      {track.metadata?.album && ` • ${track.metadata.album}`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {(isLoadingMore || isLoadingMetadata) && (
+              <div className="mt-4">
+                <TrackSkeleton />
+              </div>
+            )}
+            {hasMore && !error && (
+              <div ref={observerTarget} className="h-4" />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/Modal.tsx
+================
+import React, { useEffect, useRef } from "react";
+import { X } from "lucide-react";
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}
+
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+}) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        modalRef.current &&
+        !modalRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      document.addEventListener("mousedown", handleClickOutside);
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        {/* Backdrop */}
+        <div className="fixed inset-0 bg-black bg-opacity-25 transition-opacity" />
+
+        {/* Modal */}
+        <div
+          ref={modalRef}
+          className="relative w-full max-w-md transform rounded-lg bg-white dark:bg-gray-800 p-6 text-left shadow-xl transition-all"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              {title}
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Content */}
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/Player.css
+================
+/* Progress bar and volume slider styles */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Progress bar track */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: rgb(37 99 235 / 0.2); /* blue-600/20 */
+}
+
+.dark input[type="range"]::-webkit-slider-runnable-track {
+  background: rgb(96 165 250 / 0.2); /* blue-400/20 */
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: rgb(37 99 235 / 0.2);
+}
+
+.dark input[type="range"]::-moz-range-track {
+  background: rgb(96 165 250 / 0.2);
+}
+
+/* Progress bar thumb */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -4px;
+  background-color: rgb(37 99 235); /* blue-600 */
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+}
+
+.dark input[type="range"]::-webkit-slider-thumb {
+  background-color: rgb(96 165 250); /* blue-400 */
+}
+
+input[type="range"]::-moz-range-thumb {
+  border: none;
+  background-color: rgb(37 99 235);
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+}
+
+.dark input[type="range"]::-moz-range-thumb {
+  background-color: rgb(96 165 250);
+}
+
+/* Progress bar focus styles */
+input[type="range"]:focus {
+  outline: none;
+}
+
+input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.2);
+}
+
+.dark input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px rgb(96 165 250 / 0.2);
+}
+
+input[type="range"]:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.2);
+}
+
+.dark input[type="range"]:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 2px rgb(96 165 250 / 0.2);
+}
+
+/* Progress bar hover styles */
+input[type="range"]:hover::-webkit-slider-thumb {
+  background-color: rgb(29 78 216); /* blue-700 */
+}
+
+.dark input[type="range"]:hover::-webkit-slider-thumb {
+  background-color: rgb(59 130 246); /* blue-500 */
+}
+
+input[type="range"]:hover::-moz-range-thumb {
+  background-color: rgb(29 78 216);
+}
+
+.dark input[type="range"]:hover::-moz-range-thumb {
+  background-color: rgb(59 130 246);
+}
+
+/* Volume slider specific styles */
+.volume-slider {
+  width: 96px;
+}
+
+.volume-slider::-webkit-slider-runnable-track {
+  height: 3px;
+}
+
+.volume-slider::-moz-range-track {
+  height: 3px;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  height: 10px;
+  width: 10px;
+  margin-top: -3.5px;
+}
+
+.volume-slider::-moz-range-thumb {
+  height: 10px;
+  width: 10px;
+}
+
+================
+File: frontend/src/components/Player.tsx
+================
+import React, { useRef, useEffect } from "react";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Music,
+} from "lucide-react";
+import { usePlayerStore } from "../store/playerStore";
+import "./Player.css";
+
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
+export const Player: React.FC = () => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const progressRef = useRef<HTMLInputElement>(null);
+  const {
+    currentTrack,
+    isPlaying,
+    volume,
+    currentTime,
+    duration,
+    setIsPlaying,
+    setVolume,
+    setCurrentTime,
+    setDuration,
+    skipForward,
+    skipBackward,
+    playlist,
+  } = usePlayerStore();
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  useEffect(() => {
+    if (currentTrack?.temporaryLink) {
+      setIsPlaying(true);
+    }
+  }, [currentTrack, setIsPlaying]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(() => setIsPlaying(false));
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying, setIsPlaying]);
+
+  if (!currentTrack) {
+    return null;
+  }
+
+  const togglePlay = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const toggleMute = () => {
+    setVolume(volume === 0 ? 1 : 0);
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
+  };
+
+  const currentIndex = playlist.findIndex(
+    (track) => track.id === currentTrack.id
+  );
+  const canSkipForward = currentIndex < playlist.length - 1;
+  const canSkipBackward = currentIndex > 0;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+      {/* Progress Bar */}
+      <div className="w-full h-1.5 relative">
+        <input
+          ref={progressRef}
+          type="range"
+          min="0"
+          max={duration || 100}
+          value={currentTime}
+          onChange={handleSeek}
+          className="absolute inset-0 w-full h-full"
+        />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-3">
+        <div className="flex items-center justify-between">
+          {/* Track Info */}
+          <div className="flex items-center space-x-4 flex-1">
+            <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-md flex items-center justify-center overflow-hidden">
+              {currentTrack.metadata?.picture ? (
+                <img
+                  src={currentTrack.metadata.picture.data}
+                  alt={currentTrack.metadata.picture.description}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Music size={20} className="text-gray-500 dark:text-gray-400" />
+              )}
+            </div>
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white">
+                {currentTrack.metadata?.title || currentTrack.name}
+              </h3>
+              <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center space-x-2">
+                <span>{currentTrack.metadata?.artist || "Unknown Artist"}</span>
+                <span>•</span>
+                <span>{formatTime(currentTime)}</span>
+                <span>/</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Playback Controls */}
+          <div className="flex items-center justify-center space-x-4 flex-1">
+            <button
+              onClick={skipBackward}
+              className={`p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200 ${
+                !canSkipBackward ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={!canSkipBackward}
+              title="Previous Track"
+            >
+              <SkipBack size={20} />
+            </button>
+
+            <button
+              onClick={togglePlay}
+              className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors duration-200 transform hover:scale-105"
+              title={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+            </button>
+
+            <button
+              onClick={skipForward}
+              className={`p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200 ${
+                !canSkipForward ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              disabled={!canSkipForward}
+              title="Next Track"
+            >
+              <SkipForward size={20} />
+            </button>
+          </div>
+
+          {/* Volume Control */}
+          <div className="flex items-center space-x-2 flex-1 justify-end">
+            <button
+              onClick={toggleMute}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200"
+              title={volume === 0 ? "Unmute" : "Mute"}
+            >
+              {volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+            </button>
+
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={handleVolumeChange}
+              className="volume-slider"
+              title="Volume"
+            />
+          </div>
+        </div>
+      </div>
+
+      <audio
+        ref={audioRef}
+        src={currentTrack.temporaryLink}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={() => {
+          if (canSkipForward) {
+            skipForward();
+          } else {
+            setIsPlaying(false);
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/Playlists.tsx
+================
+import React, { useState, useEffect } from "react";
+import { FolderPlus, Trash2, Pencil, Clock } from "lucide-react";
+import { Modal } from "./Modal";
+import toast from "react-hot-toast";
+import { 
+  createPlaylist, 
+  fetchPlaylists, 
+  deletePlaylist, 
+  updatePlaylist 
+} from "../utils/supabase";
+import { Playlist } from "../types/supabase";
+
+interface PlaylistFormData {
+  name: string;
+  description: string;
+}
+
+export const Playlists: React.FC = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState<PlaylistFormData>({
+    name: "",
+    description: "",
+  });
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
+
+  useEffect(() => {
+    loadPlaylists();
+  }, []);
+
+  const loadPlaylists = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await fetchPlaylists();
+      setPlaylists(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load playlists';
+      setError(errorMessage);
+      toast(errorMessage, {
+        icon: '❌',
+        style: {
+          background: '#fef2f2',
+          color: '#991b1b'
+        }
+      });
+      console.error('Error loading playlists:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      if (editingPlaylist) {
+        await updatePlaylist(editingPlaylist.id, formData);
+      } else {
+        await createPlaylist(formData.name, formData.description);
+      }
+      
+      await loadPlaylists();
+      setFormData({ name: "", description: "" });
+      setEditingPlaylist(null);
+      setIsModalOpen(false);
+
+      const action = editingPlaylist ? 'updated' : 'created';
+      toast(`Playlist ${action} successfully!`, {
+        icon: '✅',
+        duration: 3000
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save playlist';
+      setError(errorMessage);
+      toast(errorMessage, {
+        icon: '❌',
+        style: {
+          background: '#fef2f2',
+          color: '#991b1b'
+        }
+      });
+      console.error("Failed to save playlist:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this playlist?')) return;
+    
+    try {
+      setError(null);
+      await deletePlaylist(id);
+      await loadPlaylists();
+      toast('Playlist deleted successfully!', {
+        icon: '🗑️',
+        duration: 3000
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete playlist';
+      setError(errorMessage);
+      toast(errorMessage, {
+        icon: '❌',
+        style: {
+          background: '#fef2f2',
+          color: '#991b1b'
+        }
+      });
+      console.error("Failed to delete playlist:", err);
+    }
+  };
+
+  const handleEdit = (playlist: Playlist) => {
+    setFormData({
+      name: playlist.name,
+      description: playlist.description || "",
+    });
+    setEditingPlaylist(playlist);
+    setIsModalOpen(true);
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setFormData({ name: "", description: "" });
+    setEditingPlaylist(null);
+    setError(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Playlists
+        </h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <FolderPlus className="h-5 w-5 mr-2" />
+          New Playlist
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {error}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-500 dark:text-gray-400">Loading playlists...</p>
+        </div>
+      ) : playlists.length === 0 ? (
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
+          <FolderPlus className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+            No playlists
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Get started by creating a new playlist
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {playlists.map((playlist) => (
+            <div
+              key={playlist.id}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden"
+            >
+              <div className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white truncate">
+                      {playlist.name}
+                    </h3>
+                    {playlist.description && (
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                        {playlist.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex space-x-2 ml-4">
+                    <button
+                      onClick={() => handleEdit(playlist)}
+                      className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                    >
+                      <Pencil className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(playlist.id)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
+                  <Clock className="h-4 w-4 mr-1" />
+                  <span>
+                    Created {new Date(playlist.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Playlist Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        title={editingPlaylist ? "Edit Playlist" : "Create New Playlist"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Name
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              required
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e as any);
+                }
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+              placeholder="My Awesome Playlist"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Description (optional)
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+              rows={3}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+              placeholder="Enter a description for your playlist..."
+            />
+          </div>
+
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!formData.name.trim() || isSubmitting}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting 
+                ? (editingPlaylist ? "Saving..." : "Creating...") 
+                : (editingPlaylist ? "Save Changes" : "Create Playlist")}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/Profile.tsx
+================
+import React from 'react';
+import useSupabaseAuthStore from '../store/supabaseAuthStore';
+import { User } from 'lucide-react';
+
+const Profile = () => {
+  const { user } = useSupabaseAuthStore();
+
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+            <User className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Profile</h1>
+            <p className="text-gray-600 dark:text-gray-400">Manage your account details</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</h3>
+            <p className="mt-1 text-gray-900 dark:text-white">{user.email}</p>
+          </div>
+          
+          <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Account ID</h3>
+            <p className="mt-1 text-gray-900 dark:text-white font-mono text-sm">{user.id}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Profile;
+
+================
+File: frontend/src/components/Settings.tsx
+================
+import React from "react";
+import { Moon, Sun, LogOut } from "lucide-react";
+import { useThemeStore } from "../store/themeStore";
+import { useAuthStore } from "../store/authStore";
+import { getAuthUrl, revokeAccess } from "../utils/dropbox";
+
+export const Settings: React.FC = () => {
+  const { isDarkMode, toggleTheme } = useThemeStore();
+  const { isAuthenticated, error } = useAuthStore();
+
+  const handleAuthAction = async () => {
+    if (isAuthenticated) {
+      try {
+        await revokeAccess();
+      } catch (error) {
+        console.error("Error disconnecting from Dropbox:", error);
+      }
+    } else {
+      try {
+        const authUrl = await getAuthUrl();
+        window.location.href = authUrl;
+      } catch (error) {
+        console.error("Error generating auth URL:", error);
+      }
+    }
+  };
+
+  const handleReconnect = async () => {
+    try {
+      const authUrl = await getAuthUrl();
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error("Error generating auth URL:", error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+          Settings
+        </h2>
+
+        <div className="space-y-6">
+          {/* Theme Toggle */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Appearance
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Toggle between light and dark mode
+                </p>
+              </div>
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title={
+                  isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+                }
+              >
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Dropbox Connection */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Dropbox Connection
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Manage your Dropbox connection
+                </p>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <div className="flex flex-col space-y-3">
+                <button
+                  onClick={handleAuthAction}
+                  className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                    isAuthenticated
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                    isAuthenticated
+                      ? "focus:ring-red-500"
+                      : "focus:ring-blue-500"
+                  }`}
+                >
+                  <LogOut className="h-5 w-5 mr-2" />
+                  {isAuthenticated ? "Disconnect Dropbox" : "Connect Dropbox"}
+                </button>
+
+                {isAuthenticated && (
+                  <button
+                    onClick={handleReconnect}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Reconnect Dropbox
+                  </button>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                {isAuthenticated
+                  ? "Your Dropbox account is connected. You can disconnect or reconnect at any time."
+                  : "Connect your Dropbox account to access your music library."}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/SupabaseAuthCallback.tsx
+================
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import useSupabaseAuthStore from '../store/supabaseAuthStore';
+import { handleSupabaseCallback } from '../utils/supabase';
+import toast from 'react-hot-toast';
+
+export const SupabaseAuthCallback: React.FC = () => {
+  const navigate = useNavigate();
+  const { setSession, setUser } = useSupabaseAuthStore();
+
+  useEffect(() => {
+    async function handleCallback() {
+      const loadingToast = toast.loading('Signing you in...', {
+        position: 'top-center'
+      });
+      
+      try {
+        const session = await handleSupabaseCallback();
+        if (session) {
+          // Set both session and user state before navigation
+          setSession(session);
+          setUser(session.user);
+          
+          toast.dismiss(loadingToast);
+          toast.success('Successfully signed in!', {
+            icon: '🎉',
+            duration: 3000
+          });
+          
+          // Small delay to ensure state is updated before navigation
+          await new Promise(resolve => setTimeout(resolve, 100));
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error handling auth callback:', error);
+        toast.dismiss(loadingToast);
+        toast.error('Failed to sign in. Please try again.', {
+          icon: '❌',
+          duration: 5000
+        });
+        navigate('/');
+      }
+    }
+
+    handleCallback();
+  }, [navigate, setSession, setUser]);
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-400">
+          Completing sign in...
+        </p>
+      </div>
+    </div>
+  );
+};
+
+================
+File: frontend/src/components/TrackSkeleton.tsx
+================
+import React from "react";
+
+export const TrackSkeleton: React.FC = () => {
+  return (
+    <div className="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+      <div className="flex items-center space-x-4">
+        <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 animate-pulse" />
+          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+================
+File: frontend/src/store/authStore.ts
+================
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { AuthState } from "../types";
+
+interface AuthStore extends AuthState {
+  setAuth: (auth: Partial<AuthState>) => void;
+  clearAuth: () => void;
+}
+
+const initialState: AuthState = {
+  isAuthenticated: false,
+  isAuthenticating: false,
+  accessToken: null,
+  refreshToken: null,
+  expiresAt: null,
+  error: null,
+};
+
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      ...initialState,
+      setAuth: (auth) => set((state) => ({ ...state, ...auth })),
+      clearAuth: () => set(initialState),
+    }),
+    {
+      name: "auth-storage",
+      partialize: (state) => ({
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        expiresAt: state.expiresAt,
+        isAuthenticated: state.isAuthenticated,
+        isAuthenticating: state.isAuthenticating,
+      }),
+    }
+  )
+);
+
+================
+File: frontend/src/store/playerStore.ts
+================
+import { create } from 'zustand';
+import { Track, PlayerState } from '../types';
+import type { AudioMetadata } from '../utils/metadata';
+
+interface PlayerStore extends PlayerState {
+  setCurrentTrack: (track: Track | null) => void;
+  setIsPlaying: (isPlaying: boolean) => void;
+  setVolume: (volume: number) => void;
+  setPlaylist: (playlist: Track[]) => void;
+  appendToPlaylist: (tracks: Track[]) => void;
+  setIsLoadingMore: (isLoading: boolean) => void;
+  setHasMore: (hasMore: boolean) => void;
+  setCursor: (cursor: string | null) => void;
+  setCurrentTime: (time: number) => void;
+  setDuration: (duration: number) => void;
+  skipForward: () => void;
+  skipBackward: () => void;
+  setMetadata: (trackId: string, metadata: AudioMetadata) => void;
+  setIsLoadingMetadata: (isLoading: boolean) => void;
+  setMetadataError: (error: string | null) => void;
+}
+
+export const usePlayerStore = create<PlayerStore>((set, get) => ({
+  currentTrack: null,
+  isPlaying: false,
+  volume: 1,
+  playlist: [],
+  isLoadingMore: false,
+  hasMore: true,
+  cursor: null,
+  currentTime: 0,
+  duration: 0,
+  isLoadingMetadata: false,
+  metadataError: null,
+  metadataCache: new Map(),
+  setCurrentTrack: (track) => set({ currentTrack: track }),
+  setIsPlaying: (isPlaying) => set({ isPlaying }),
+  setVolume: (volume) => set({ volume }),
+  setPlaylist: (playlist) => set({ playlist }),
+  appendToPlaylist: (tracks) => 
+    set((state) => ({ playlist: [...state.playlist, ...tracks] })),
+  setIsLoadingMore: (isLoadingMore) => set({ isLoadingMore }),
+  setHasMore: (hasMore) => set({ hasMore }),
+  setCursor: (cursor) => set({ cursor }),
+  setCurrentTime: (currentTime) => set({ currentTime }),
+  setDuration: (duration) => set({ duration }),
+  skipForward: () => {
+    const { playlist, currentTrack } = get();
+    if (!currentTrack || playlist.length === 0) return;
+
+    const currentIndex = playlist.findIndex(track => track.id === currentTrack.id);
+    if (currentIndex === -1) return;
+
+    const nextIndex = (currentIndex + 1) % playlist.length;
+    set({ 
+      currentTrack: playlist[nextIndex],
+      currentTime: 0,
+      isPlaying: true
+    });
+  },
+  skipBackward: () => {
+    const { playlist, currentTrack } = get();
+    if (!currentTrack || playlist.length === 0) return;
+
+    const currentIndex = playlist.findIndex(track => track.id === currentTrack.id);
+    if (currentIndex === -1) return;
+
+    const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+    set({ 
+      currentTrack: playlist[prevIndex],
+      currentTime: 0,
+      isPlaying: true
+    });
+  },
+  setMetadata: (trackId, metadata) => 
+    set((state) => {
+      const newCache = new Map(state.metadataCache);
+      newCache.set(trackId, metadata);
+      const playlist = state.playlist.map(track => 
+        track.id === trackId ? { ...track, metadata } : track
+      );
+      const currentTrack = state.currentTrack?.id === trackId 
+        ? { ...state.currentTrack, metadata }
+        : state.currentTrack;
+      return { 
+        metadataCache: newCache,
+        playlist,
+        currentTrack,
+      };
+    }),
+  setIsLoadingMetadata: (isLoading) => set({ isLoadingMetadata: isLoading }),
+  setMetadataError: (error) => set({ metadataError: error }),
+}));
+
+================
+File: frontend/src/store/supabaseAuthStore.ts
+================
+import { create } from 'zustand';
+import { supabase, getSession, onAuthStateChange } from '../utils/supabase';
+import { Session } from '@supabase/supabase-js';
+
+interface SupabaseAuthState {
+  user: any | null; //  use a more specific type later
+  session: Session | null;
+  isLoading: boolean;
+  error: string | null;
+  setSession: (session: Session | null) => void;
+  setUser: (user: any | null) => void; //  use a more specific type later
+  clearAuth: () => void;
+  startLoading: () => void;
+  setError: (error: string | null) => void;
+}
+
+const useSupabaseAuthStore = create<SupabaseAuthState>((set) => ({
+  user: null,
+  session: null,
+  isLoading: true,
+  error: null,
+  setSession: (session) => set({ session, isLoading: false, error: null }),
+  setUser: (user) => set({ user, error: null }),
+  clearAuth: () => set({ user: null, session: null, isLoading: false, error: null }),
+  startLoading: () => set({ isLoading: true }),
+  setError: (error) => set({ error, isLoading: false })
+}));
+
+// Initialize session and set up auth change listener
+async function initializeAuth() {
+  try {
+    useSupabaseAuthStore.getState().startLoading();
+    const initialSession = await getSession();
+    
+    if (initialSession) {
+      useSupabaseAuthStore.setState({ 
+        session: initialSession, 
+        user: initialSession.user,
+        isLoading: false,
+        error: null 
+      });
+    } else {
+      useSupabaseAuthStore.setState({ 
+        session: null, 
+        user: null,
+        isLoading: false,
+        error: null 
+      });
+    }
+
+    onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        useSupabaseAuthStore.setState({ 
+          user: session.user, 
+          session: session, 
+          isLoading: false,
+          error: null 
+        });
+      } else if (event === 'SIGNED_OUT') {
+        useSupabaseAuthStore.setState({ 
+          user: null, 
+          session: null, 
+          isLoading: false,
+          error: null 
+        });
+      } else if (event === 'USER_UPDATED' && session) {
+        useSupabaseAuthStore.setState({ 
+          user: session.user, 
+          session: session,
+          error: null 
+        });
+      }
+    });
+  } catch (error) {
+    useSupabaseAuthStore.setState({ 
+      isLoading: false, 
+      error: error instanceof Error ? error.message : 'An error occurred' 
+    });
+  }
+}
+initializeAuth()
+export default useSupabaseAuthStore;
+
+================
+File: frontend/src/store/themeStore.ts
+================
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+
+interface ThemeState {
+  isDarkMode: boolean;
+  toggleTheme: () => void;
+}
+
+export const useThemeStore = create<ThemeState>()(
+  persist(
+    (set) => ({
+      isDarkMode: window.matchMedia("(prefers-color-scheme: dark)").matches,
+      toggleTheme: () => {
+        set((state) => {
+          const newDarkMode = !state.isDarkMode;
+          if (newDarkMode) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+          return { isDarkMode: newDarkMode };
+        });
+      },
+    }),
+    {
+      name: "theme-storage",
+      storage: createJSONStorage(() => localStorage),
+    }
+  )
+);
+
+// Initialize theme on load
+const initializeTheme = () => {
+  const isDarkMode = useThemeStore.getState().isDarkMode;
+  if (isDarkMode) {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
+};
+
+// Call initialization
+initializeTheme();
+
+================
+File: frontend/src/types/auth.ts
+================
+import { User as SupabaseUser } from '@supabase/supabase-js';
+
+export interface UserProfile {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+}
+
+// Keep existing Dropbox types
+export interface AuthSession {
+  user: {
+    id: string;
+    email: string;
+    user_metadata: {
+      username?: string;
+    };
+  };
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
+export interface AuthError {
+  message: string;
+  status?: number;
+}
+
+// Add Supabase user type
+export type SupabaseUserType = SupabaseUser;
+
+================
+File: frontend/src/types/supabase.ts
+================
+export interface Profile {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+}
+
+export interface Playlist {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface Track {
+  id: string;
+  user_id: string;
+  dropbox_id: string;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  year: string | null;
+  genre: string | null;
+  picture: any | null;
+  encrypted_key: string;
+  iv: string;
+  created_at: string;
+}
+
+export interface PlaylistTrack {
+  playlist_id: string;
+  track_id: string;
+  added_at: string;
+}
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: Profile;
+        Insert: Omit<Profile, 'id'>;
+        Update: Partial<Omit<Profile, 'id'>>;
+      };
+      playlists: {
+        Row: Playlist;
+        Insert: Omit<Playlist, 'id' | 'created_at'>;
+        Update: Partial<Omit<Playlist, 'id' | 'created_at'>>;
+      };
+      tracks: {
+        Row: Track;
+        Insert: Omit<Track, 'id' | 'created_at'>;
+        Update: Partial<Omit<Track, 'id' | 'created_at'>>;
+      };
+      playlist_tracks: {
+        Row: PlaylistTrack;
+        Insert: Omit<PlaylistTrack, 'added_at'>;
+        Update: Partial<Omit<PlaylistTrack, 'added_at'>>;
+      };
+    };
+  };
+}
+
+================
+File: frontend/src/utils/dropbox.ts
+================
+import { Dropbox } from "dropbox";
+import { useAuthStore } from "../store/authStore";
+import { usePlayerStore } from "../store/playerStore";
+import { DropboxError } from "../types";
+import type { Track, DropboxAuthResponse } from "../types";
+
+const DROPBOX_APP_KEY = import.meta.env.VITE_DROPBOX_APP_KEY || "";
+const DROPBOX_APP_SECRET = import.meta.env.VITE_DROPBOX_APP_SECRET || "";
+const REDIRECT_URI = window.location.origin + "/auth/dropbox/callback";
+const PAGE_SIZE = 20;
+
+export const getAuthUrl = async (): Promise<string> => {
+  return `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&redirect_uri=${encodeURIComponent(
+    REDIRECT_URI
+  )}&response_type=code`;
+};
+
+export const handleAuthCallback = async (code: string): Promise<void> => {
+  try {
+    useAuthStore.getState().setAuth({ isAuthenticating: true });
+    const params = new URLSearchParams({
+      code,
+      grant_type: "authorization_code",
+      redirect_uri: REDIRECT_URI,
+    });
+
+    const authString = btoa(`${DROPBOX_APP_KEY}:${DROPBOX_APP_SECRET}`);
+
+    const response = await fetch("https://api.dropbox.com/oauth2/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${authString}`,
+      },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Token exchange failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
+
+      const errorCode = errorData.error || "unknown_error";
+      const errorDesc = errorData.error_description || response.statusText;
+      throw new DropboxError(
+        `Failed to exchange authorization code: ${errorDesc}`,
+        errorCode,
+        errorDesc
+      );
+    }
+
+    const data: DropboxAuthResponse = await response.json();
+    const expiresAt = Date.now() + data.expires_in * 1000;
+
+    useAuthStore.getState().setAuth({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt,
+      isAuthenticated: true,
+      isAuthenticating: false,
+      error: null,
+    });
+  } catch (error) {
+    console.error("Auth callback error:", error);
+    useAuthStore.getState().setAuth({
+      error: error instanceof Error ? error.message : "Authentication failed",
+      isAuthenticating: false,
+    });
+  }
+};
+
+export const refreshAccessToken = async (): Promise<void> => {
+  const { refreshToken } = useAuthStore.getState();
+
+  if (!refreshToken) {
+    throw new Error("No refresh token available");
+  }
+
+  try {
+    useAuthStore.getState().setAuth({ isAuthenticating: true });
+    const params = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    });
+
+    const authString = btoa(`${DROPBOX_APP_KEY}:${DROPBOX_APP_SECRET}`);
+
+    const response = await fetch("https://api.dropbox.com/oauth2/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${authString}`,
+      },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Token refresh failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
+      throw new DropboxError(
+        "Failed to refresh token",
+        errorData.error || "unknown_error",
+        errorData.error_description || response.statusText
+      );
+    }
+
+    const data: DropboxAuthResponse = await response.json();
+    const expiresAt = Date.now() + data.expires_in * 1000;
+
+    useAuthStore.getState().setAuth({
+      accessToken: data.access_token,
+      expiresAt,
+      isAuthenticating: false,
+      error: null,
+    });
+  } catch (error) {
+    useAuthStore.getState().setAuth({
+      error: error instanceof Error ? error.message : "Token refresh failed",
+      isAuthenticating: false,
+    });
+  }
+};
+
+export const createDropboxClient = (): Dropbox | null => {
+  const { accessToken, expiresAt } = useAuthStore.getState();
+
+  if (!accessToken || !expiresAt) {
+    console.log(
+      "Cannot create Dropbox client: Missing access token or expiry time"
+    );
+    return null;
+  }
+
+  const timeUntilExpiry = expiresAt - Date.now();
+  console.log(
+    "Access token expires in:",
+    Math.round(timeUntilExpiry / 1000),
+    "seconds"
+  );
+
+  if (timeUntilExpiry < 300000) {
+    console.log("Access token expiring soon. Attempting refresh...");
+    refreshAccessToken();
+  }
+
+  console.log("Creating Dropbox client with valid access token");
+  return new Dropbox({ accessToken });
+};
+
+const processFiles = async (
+  client: Dropbox,
+  entries: Array<{ ".tag": string; path_display?: string; name: string }>,
+  setPagination: boolean = true
+): Promise<Track[]> => {
+  const tracks: Track[] = [];
+  const failures: Array<{ name: string; error: string }> = [];
+
+  for (const entry of entries) {
+    if (entry[".tag"] !== "file") {
+      console.log(
+        "Skipping non-file entry:",
+        entry[".tag"],
+        entry.path_display
+      );
+      continue;
+    }
+
+    const path = entry.path_display;
+    const name = entry.name;
+
+    if (!path || !name) {
+      console.log("Skipping entry with missing path or name:", { path, name });
+      continue;
+    }
+
+    const isMusicFile = /\.(mp3|m4a|wav|ogg|flac)$/i.test(path);
+
+    if (!isMusicFile) {
+      console.log("Skipping non-music file:", path);
+      continue;
+    }
+
+    console.log("Processing music file:", { name, path });
+
+    try {
+      console.log("Getting temporary link for:", path);
+      const linkResponse = await client.filesGetTemporaryLink({
+        path,
+      });
+      console.log("Got temporary link");
+
+      tracks.push({
+        id: path,
+        name,
+        path,
+        temporaryLink: linkResponse.result.link,
+        encryptedKey: "",
+        iv: "",
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error(`Failed to get temporary link for ${entry.name}:`, error);
+      failures.push({ name: entry.name, error: errorMessage });
+    }
+  }
+
+  if (failures.length > 0) {
+    console.error("Failed to process some files:", failures);
+    if (tracks.length === 0 && failures.length > 0) {
+      throw new Error(
+        `Failed to process any files. Errors: ${failures
+          .map((f) => `${f.name} (${f.error})`)
+          .join(", ")}`
+      );
+    }
+  }
+
+  return tracks;
+};
+
+export const fetchFiles = async (
+  client: Dropbox,
+  cursor?: string
+): Promise<Track[]> => {
+  try {
+    const playerStore = usePlayerStore.getState();
+
+    if (cursor) {
+      console.log("Fetching more files using cursor:", cursor);
+      const response = await client.filesListFolderContinue({ cursor });
+      const tracks = await processFiles(client, response.result.entries);
+
+      playerStore.setHasMore(response.result.has_more);
+      if (response.result.has_more) {
+        playerStore.setCursor(response.result.cursor);
+      }
+
+      return tracks;
+    }
+
+    console.log("Fetching initial files from Dropbox root directory...");
+    const response = await client.filesListFolder({
+      path: "",
+      limit: PAGE_SIZE,
+      include_media_info: true,
+    });
+
+    console.log("Files found:", response.result.entries.length);
+    const tracks = await processFiles(client, response.result.entries);
+
+    playerStore.setHasMore(response.result.has_more);
+    if (response.result.has_more) {
+      playerStore.setCursor(response.result.cursor);
+    }
+
+    return tracks;
+  } catch (error) {
+    console.error("Error fetching files:", error);
+    if (error instanceof Error) {
+      if (error.message.includes("path/not_found")) {
+        throw new DropboxError(
+          "Could not find the specified path in your Dropbox",
+          "path/not_found"
+        );
+      } else if (error.message.includes("invalid_access_token")) {
+        throw new DropboxError(
+          "Your Dropbox session has expired",
+          "invalid_access_token"
+        );
+      }
+    }
+    throw error;
+  }
+};
+
+export const revokeAccess = async (): Promise<void> => {
+  const { accessToken } = useAuthStore.getState();
+
+  if (!accessToken) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      "https://api.dropboxapi.com/2/auth/token/revoke",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Token revocation failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
+
+      let errorCode = "unknown_error";
+      if (
+        typeof errorData.error === "object" &&
+        errorData.error !== null &&
+        ".tag" in errorData.error
+      ) {
+        errorCode = errorData.error[".tag"];
+      } else if (typeof errorData.error === "string") {
+        errorCode = errorData.error;
+      }
+
+      switch (errorCode) {
+        case "invalid_access_token":
+          throw new DropboxError(
+            "Token already expired or invalid",
+            "invalid_access_token"
+          );
+        case "expired_access_token":
+          throw new DropboxError(
+            "Token has already expired",
+            "expired_access_token"
+          );
+        default:
+          throw new DropboxError(
+            "Failed to revoke access",
+            errorCode,
+            errorData.error_description || response.statusText
+          );
+      }
+    }
+
+    useAuthStore.getState().clearAuth();
+    console.log("Successfully revoked Dropbox access");
+  } catch (error) {
+    console.error("Error revoking access:", error);
+    useAuthStore.getState().setAuth({
+      error: error instanceof Error ? error.message : "Failed to revoke access",
+    });
+    useAuthStore.getState().clearAuth();
+  }
+};
+
+================
+File: frontend/src/utils/encryption.ts
+================
+import { box, randomBytes } from 'tweetnacl';
+import { encodeBase64, decodeBase64 } from 'tweetnacl-util';
+
+export const generateKeyPair = () => {
+  const keyPair = box.keyPair();
+  return {
+    publicKey: encodeBase64(keyPair.publicKey),
+    secretKey: encodeBase64(keyPair.secretKey)
+  };
+};
+
+export const encryptFile = async (file: File, publicKey: Uint8Array): Promise<{ encrypted: Uint8Array, key: Uint8Array }> => {
+  const fileKey = randomBytes(box.secretKeyLength);
+  const nonce = randomBytes(box.nonceLength);
+  
+  const fileBuffer = await file.arrayBuffer();
+  const encrypted = box(new Uint8Array(fileBuffer), nonce, publicKey, fileKey);
+  
+  return {
+    encrypted: encrypted,
+    key: fileKey
+  };
+};
+
+export const decryptFile = (encrypted: Uint8Array, key: Uint8Array, secretKey: Uint8Array): Uint8Array => {
+  const nonce = encrypted.slice(0, box.nonceLength);
+  const message = encrypted.slice(box.nonceLength);
+  
+  const decrypted = box.open(message, nonce, key, secretKey);
+  if (!decrypted) throw new Error('Failed to decrypt file');
+  
+  return decrypted;
+};
+
+================
+File: frontend/src/utils/metadata.ts
+================
+import * as mmb from 'music-metadata-browser';
+import { Track } from '../types';
+import { usePlayerStore } from '../store/playerStore';
+
+export interface Picture {
+  data: string;
+  format: string;
+  type: string;
+  description: string;
+}
+
+export interface AudioMetadata {
+  title?: string;
+  artist?: string;
+  album?: string;
+  year?: string;
+  genre?: string;
+  picture?: Picture;
+}
+
+// Rate limiting configuration
+const CONCURRENT_REQUESTS = 3;
+const REQUEST_DELAY = 500; // ms between requests
+
+// Helper function to convert Uint8Array to base64 string
+const uint8ArrayToBase64 = (bytes: Uint8Array): string => {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+};
+
+const defaultPicture: Picture = {
+  data: `data:image/svg+xml;base64,${btoa(`
+    <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <rect width="200" height="200" fill="#f3f4f6"/>
+      <path d="M100 65c-19.33 0-35 15.67-35 35s15.67 35 35 35 35-15.67 35-35-15.67-35-35-35zm0 60c-13.785 0-25-11.215-25-25s11.215-25 25-25 25 11.215 25 25-11.215 25-25 25z" fill="#9ca3af"/>
+      <circle cx="100" cy="100" r="10" fill="#9ca3af"/>
+      <path d="M100 40v-10" stroke="#9ca3af" stroke-width="4"/>
+      <path d="M100 170v-10" stroke="#9ca3af" stroke-width="4"/>
+      <path d="M40 100h-10" stroke="#9ca3af" stroke-width="4"/>
+      <path d="M170 100h-10" stroke="#9ca3af" stroke-width="4"/>
+    </svg>
+  `)}`,
+  format: 'image/svg+xml',
+  type: 'Front Cover',
+  description: 'Default Album Art',
+};
+
+const getBase64Picture = (picture: mmb.IPicture): Picture => {
+  return {
+    data: `data:${picture.format};base64,${uint8ArrayToBase64(picture.data)}`,
+    format: picture.format,
+    type: picture.type || 'Front Cover',
+    description: picture.description || 'Album Art',
+  };
+};
+
+// Helper function to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Process tracks in batches with rate limiting
+export const processMetadata = async (tracks: Track[]): Promise<AudioMetadata[]> => {
+  const results: AudioMetadata[] = [];
+  const batches = [];
+  
+  // Split tracks into batches
+  for (let i = 0; i < tracks.length; i += CONCURRENT_REQUESTS) {
+    batches.push(tracks.slice(i, i + CONCURRENT_REQUESTS));
+  }
+
+  // Process each batch
+  for (const batch of batches) {
+    const batchPromises = batch.map(track => getMetadata(track));
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+    
+    // Add delay between batches
+    if (batches.indexOf(batch) < batches.length - 1) {
+      await delay(REQUEST_DELAY);
+    }
+  }
+
+  return results;
+};
+
+export const getMetadata = async (track: Track): Promise<AudioMetadata> => {
+  const playerStore = usePlayerStore.getState();
+
+  // Check cache first
+  if (playerStore.metadataCache.has(track.id)) {
+    return playerStore.metadataCache.get(track.id)!;
+  }
+
+  playerStore.setIsLoadingMetadata(true);
+  playerStore.setMetadataError(null);
+
+  try {
+    // Fetch audio data
+    const response = await fetch(track.temporaryLink);
+    if (!response.ok) {
+      throw new Error('Failed to fetch audio data');
+    }
+
+    const buffer = await response.arrayBuffer();
+    const metadata = await mmb.parseBuffer(
+      new Uint8Array(buffer),
+      track.name.split('.').pop() || 'mp3'
+    );
+
+    const audioMetadata: AudioMetadata = {
+      title: metadata.common.title || track.name,
+      artist: metadata.common.artist || 'Unknown Artist',
+      album: metadata.common.album || 'Unknown Album',
+      year: metadata.common.year?.toString() || '',
+      genre: metadata.common.genre?.join(', ') || '',
+      picture: metadata.common.picture?.[0]
+        ? getBase64Picture(metadata.common.picture[0])
+        : defaultPicture,
+    };
+
+    // Cache the metadata
+    playerStore.setMetadata(track.id, audioMetadata);
+    return audioMetadata;
+  } catch (error) {
+    console.error('Error parsing metadata:', error);
+
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch')) {
+        playerStore.setMetadataError(
+          'Failed to load track data. Please check your internet connection and try again.'
+        );
+      } else {
+        playerStore.setMetadataError(
+          'Failed to read track information. The file might be corrupted or in an unsupported format.'
+        );
+      }
+    }
+
+    // Return default metadata on error
+    const defaultMetadata: AudioMetadata = {
+      title: track.name,
+      artist: 'Unknown Artist',
+      album: 'Unknown Album',
+      year: '',
+      genre: '',
+      picture: defaultPicture,
+    };
+
+    playerStore.setMetadata(track.id, defaultMetadata);
+    return defaultMetadata;
+  } finally {
+    playerStore.setIsLoadingMetadata(false);
+  }
+};
+
+================
+File: frontend/src/utils/supabase.ts
+================
+import { createClient, AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { Database } from '../types/supabase';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+export async function signInWithOAuth() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/supabase/callback`,
+    },
+  });
+
+  if (error) {
+    console.error('Error signing in with OAuth:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error('Error signing out:', error);
+    throw error;
+  }
+}
+
+export async function getSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error('Error getting session:', error);
+    throw error;
+  }
+  return data.session;
+}
+
+export async function handleSupabaseCallback() {
+  try {
+    // Parse the URL to get the code and refresh token
+    const params = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken || !refreshToken) {
+      throw new Error('No tokens found in URL');
+    }
+
+    // Set the session with the tokens
+    const { data: { session }, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (error) throw error;
+    return session;
+  } catch (error) {
+    console.error('Error in handleSupabaseCallback:', error);
+    throw error;
+  }
+}
+
+export async function onAuthStateChange(
+  callback: (event: AuthChangeEvent, session: Session | null) => void
+) {
+  const {
+    data: { subscription },
+  } = await supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}
+
+// Playlist Management Functions
+export async function createPlaylist(name: string, description?: string) {
+  const session = await getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('playlists')
+    .insert({
+      user_id: session.user.id,
+      name,
+      description
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating playlist:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+export async function fetchPlaylists() {
+  const session = await getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('playlists')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching playlists:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+export async function deletePlaylist(id: string) {
+  const { error } = await supabase
+    .from('playlists')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting playlist:', error);
+    throw error;
+  }
+}
+
+export async function updatePlaylist(id: string, updates: { name?: string; description?: string }) {
+  const { data, error } = await supabase
+    .from('playlists')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating playlist:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+export async function addTrackToPlaylist(playlistId: string, trackId: string) {
+  const { error } = await supabase
+    .from('playlist_tracks')
+    .insert({
+      playlist_id: playlistId,
+      track_id: trackId
+    });
+
+  if (error) {
+    console.error('Error adding track to playlist:', error);
+    throw error;
+  }
+}
+
+export async function removeTrackFromPlaylist(playlistId: string, trackId: string) {
+  const { error } = await supabase
+    .from('playlist_tracks')
+    .delete()
+    .match({
+      playlist_id: playlistId,
+      track_id: trackId
+    });
+
+  if (error) {
+    console.error('Error removing track from playlist:', error);
+    throw error;
+  }
+}
+
+export async function fetchPlaylistTracks(playlistId: string) {
+  const { data, error } = await supabase
+    .from('playlist_tracks')
+    .select(`
+      track_id,
+      tracks (*)
+    `)
+    .eq('playlist_id', playlistId)
+    .order('added_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching playlist tracks:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+================
+File: frontend/src/App.tsx
+================
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import { Library } from './components/Library';
+import { Settings } from './components/Settings';
+import { Toaster } from "react-hot-toast";
+import { Playlists } from './components/Playlists';
+import { AuthCallback } from './components/AuthCallback';
+import { useAuthStore } from './store/authStore';
+import { Player } from './components/Player';
+import { usePlayerStore } from './store/playerStore';
+import { RefreshCw } from 'lucide-react';
+import useSupabaseAuthStore from './store/supabaseAuthStore';
+import { signInWithOAuth } from './utils/supabase';
+import { SupabaseAuthCallback } from './components/SupabaseAuthCallback';
+import Profile from './components/Profile';
+
+// Protected route wrapper
+const ProtectedLayout = () => {
+  const { user: supabaseUser, isLoading: isSupabaseAuthenticating } =
+    useSupabaseAuthStore();
+  const { currentTrack } = usePlayerStore();
+
+  if (isSupabaseAuthenticating) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="text-center p-8">
+          <RefreshCw
+            className="mx-auto mb-4 text-blue-600 dark:text-blue-400 animate-spin"
+            size={48}
+          />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Authenticating...
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Please wait while we verify your session
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!supabaseUser) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="text-center p-8">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+            Welcome to SoundVaultPro
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Sign in to access your music
+          </p>
+          <button
+            onClick={signInWithOAuth}
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+          >
+            Sign in with Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Layout>
+      <Routes>
+        <Route index element={<Library />} />
+        <Route path="playlists" element={<Playlists />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="profile" element={<Profile />} />
+      </Routes>
+      {currentTrack && <Player />}
+    </Layout>
+  );
+};
+
+export default function App() {
+  return (
+    <Router>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#333',
+            color: '#fff',
+          },
+          success: {
+            style: {
+              background: '#059669',
+            },
+          },
+          error: {
+            style: {
+              background: '#dc2626',
+            },
+            duration: 5000,
+          }
+        }}
+      />
+      <Routes>
+        <Route path="/auth/dropbox/callback" element={<AuthCallback />} />
+        <Route
+          path="/auth/supabase/callback"
+          element={<SupabaseAuthCallback />}
+        />
+        <Route path="/*" element={<ProtectedLayout />} />
+      </Routes>
+    </Router>
+  );
+}
+
+================
+File: frontend/src/index.css
+================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+================
+File: frontend/src/main.tsx
+================
+import { Buffer } from 'buffer';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
+
+// Add Buffer to global scope for music-metadata-browser
+globalThis.Buffer = Buffer;
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+
+================
+File: frontend/src/types.ts
+================
+import { AudioMetadata } from './utils/metadata';
+
+export class DropboxError extends Error {
+  constructor(
+    message: string,
+    public code: string = 'unknown_error',
+    public description?: string
+  ) {
+    super(message);
+    this.name = 'DropboxError';
+  }
+}
+
+export interface Track {
+  id: string;
+  name: string;
+  path: string;
+  temporaryLink: string;
+  encryptedKey?: string;
+  iv?: string;
+  metadata?: AudioMetadata;
+}
+
+export interface PlayerState {
+  currentTrack: Track | null;
+  isPlaying: boolean;
+  volume: number;
+  playlist: Track[];
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  cursor: string | null;
+  currentTime: number;
+  duration: number;
+  isLoadingMetadata: boolean;
+  metadataError: string | null;
+  metadataCache: Map<string, AudioMetadata>;
+}
+
+export interface AuthState {
+  isAuthenticated: boolean;
+  isAuthenticating: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresAt: number | null;
+  error: string | null;
+}
+
+export interface DropboxAuthResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+  uid: string;
+  account_id: string;
+}
+
+export interface DropboxListFolderResponse {
+  entries: Array<{
+    '.tag': string;
+    name: string;
+    path_display: string;
+    id: string;
+  }>;
+  cursor: string;
+  has_more: boolean;
+}
+
+================
+File: frontend/src/vite-env.d.ts
+================
+/// <reference types="vite/client" />
+
+================
+File: frontend/.gitignore
+================
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+================
+File: frontend/eslint.config.js
+================
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  { ignores: ['dist'] },
+  {
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
+  }
+);
+
+================
+File: frontend/index.html
+================
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SoundVaultPro</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+================
+File: frontend/package.json
+================
+{
+  "name": "secure-cloud-music-player",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "buffer": "^6.0.3",
+    "dropbox": "^10.34.0",
+    "lucide-react": "^0.344.0",
+    "music-metadata-browser": "^2.5.11",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hot-toast": "^2.5.2",
+    "react-router-dom": "^6.22.3",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.1",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.18",
+    "eslint": "^9.9.1",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.11",
+    "globals": "^15.9.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.3.0",
+    "vite": "^5.4.2"
+  }
+}
+
+================
+File: frontend/postcss.config.js
+================
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+
+================
+File: frontend/tailwind.config.js
+================
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        // Add custom colors if needed
+      },
+    },
+  },
+  plugins: [],
+};
+
+================
+File: frontend/tsconfig.app.json
+================
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
+
+================
+File: frontend/tsconfig.json
+================
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+
+================
+File: frontend/tsconfig.node.json
+================
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["vite.config.ts"]
+}
+
+================
+File: frontend/vite.config.ts
+================
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  optimizeDeps: {
+    esbuildOptions: {
+      // Node.js global to browser globalThis
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      // Buffer polyfill
+      buffer: 'buffer',
+    },
+  },
+});
+
+================
+File: .gitignore
+================
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+frontend/.env
+
+================
+File: package.json
+================
+{
+  "dependencies": {
+    "@supabase/supabase-js": "^2.48.1"
+  }
+}
+
+
+
+================================================================
+End of Codebase
+================================================================

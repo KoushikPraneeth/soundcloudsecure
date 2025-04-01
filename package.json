@@ -1,0 +1,17 @@
+{
+  "name": "soundcloud-secure",
+  "version": "1.0.0",
+  "description": "SoundVault Pro - A secure music streaming application",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "install": "npm install express && cd frontend && npm install"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.48.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
