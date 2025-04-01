@@ -9,7 +9,8 @@
     "install": "npm install express && cd frontend && npm install"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.48.1"
+    "@supabase/supabase-js": "^2.48.1",
+    "express": "^4.19.2"
   },
   "engines": {
     "node": ">=18"
